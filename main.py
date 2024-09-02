@@ -5,17 +5,15 @@ import asyncio
 import logging
 import ast
 from dotenv import load_dotenv
-import os
-
-#rethb123123456
-
+from os import getenv
 
 load_dotenv()
 
-token = os.getenv('TOKEN')
-OWNER_ID = os.getenv('ADMIN_ID')
+TOKEN = getenv('TOKEN')
+OWNER_ID = getenv('ADMIN_ID')
 
-bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 
