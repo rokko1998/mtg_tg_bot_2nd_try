@@ -6,6 +6,9 @@ import logging
 import ast
 from dotenv import load_dotenv
 from os import getenv
+from routers.user_router import user_router
+from routers.admin_router import admin_router
+
 
 load_dotenv()
 
@@ -21,6 +24,9 @@ async def start_bot(bot: Bot):
     await bot.send_message(chat_id=OWNER_ID, text='Бот запущен!')
 
 dp.startup.register(start_bot)
+dp.include_routers(user_router, admin_router)
+
+
 
 
 async def main():

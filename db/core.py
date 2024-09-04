@@ -18,15 +18,9 @@ engine = create_async_engine(url='postgresql://tg_bot_db.sqlite3', echo=True)
 async_session = async_sessionmaker(engine)
 
 class AsyncCore:
+    """Добавление пользователя"""
     @staticmethod
-    async def create_tables():
-        """Создает все таблицы в базе данных."""
-        async with engine.begin() as conn:
-            # await conn.run_sync(Base.metadata.drop_all) удаляет все таблицы
-            await conn.run_sync(Base.metadata.create_all)
-
-    @staticmethod
-    async def add_user(tg_id: BigInteger, username: str):
+    async def add_user(tg_id: int, username: str) -> None:
         """Добавляет нового пользователя в базу данных."""
         async with async_session() as session:
             await session.execute(insert(UserORM).values(tg_id=tg_id, username=username).prefix_with("OR IGNORE"))

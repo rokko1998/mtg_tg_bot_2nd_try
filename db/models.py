@@ -6,7 +6,7 @@ from sqlalchemy import BigInteger, ForeignKey, func, String, Integer, DateTime, 
 from sqlalchemy.orm import DeclarativeBase, Mapped, Relationship, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import Annotated, List
-from db.core import AsyncCore, engine, async_session
+from db.core import engine, async_session
 
 str_256 = Annotated[str, mapped_column(String(256))]
 stat = Annotated[int, mapped_column(default=0)]
@@ -186,20 +186,23 @@ class MatchORM(Base):
         Index('ix_tournament_round', 'tournament_id', 'round')
     )
 
-
 async def main():
-    # await AsyncCore.create_tables()
+    """Создание и заполнение временных таблиц"""
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all) удаляет все таблицы
         await conn.run_sync(Base.metadata.create_all)
     async with async_session() as session:
         Zontik_tournament = TournamentORM(name="Zontik", date= datetime(2024, 9, 10, 17, 30, 0))
         Brukwa_tournament = TournamentORM(name="Brukwa", date= datetime(2024, 9, 11, 17, 30, 0))
-        await session.add_all(Zontik_tournament, Brukwa_tournament)
+        El_tournament = TournamentORM(name="El", date=datetime(2024, 9, 11, 17, 30, 0))
+        set_dominaria = SetORM(name='Dominaria')
+
+
+        set_phirexya = SetORM(name='Phirexya')
+        set_eldraine = SetORM(name='Eldraine')
+        await session.add_all(Zontik_tournament, Brukwa_tournament, El_tournament, set_phirexya, set_dominaria, set_eldraine)
         await session.commit()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO) # Подключение логирования
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
