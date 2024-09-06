@@ -6,7 +6,23 @@ from sqlalchemy import BigInteger, ForeignKey, func, String, Integer, DateTime, 
 from sqlalchemy.orm import DeclarativeBase, Mapped, Relationship, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import Annotated, List
-from db.core import engine, async_session
+
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from dotenv import load_dotenv
+from os import getenv
+
+load_dotenv()
+DB_USER = getenv('DB_USER')
+DB_PASS = getenv('DB_PASS')
+DB_HOST = getenv('DB_HOST')
+DB_PORT = getenv('DB_PORT', '5432')  # По умолчанию порт 5432
+DB_NAME = getenv('DB_NAME')
+DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+engine = create_async_engine(DATABASE_URL, echo=True)
+async_session = async_sessionmaker(engine)
+
+
 
 str_256 = Annotated[str, mapped_column(String(256))]
 stat = Annotated[int, mapped_column(default=0)]
@@ -186,24 +202,36 @@ class MatchORM(Base):
         Index('ix_tournament_round', 'tournament_id', 'round')
     )
 
-async def main():
-    """Создание и заполнение временных таблиц"""
+
+async def create_and_populate_db():
+    """Создание всех таблиц и добавление тестовых данных"""
     async with engine.begin() as conn:
+        # Использование run_sync для создания таблиц
         await conn.run_sync(Base.metadata.create_all)
+
     async with async_session() as session:
-        Zontik_tournament = TournamentORM(name="Zontik", date= datetime(2024, 9, 10, 17, 30, 0))
-        Brukwa_tournament = TournamentORM(name="Brukwa", date= datetime(2024, 9, 11, 17, 30, 0))
-        El_tournament = TournamentORM(name="El", date=datetime(2024, 9, 11, 17, 30, 0))
-        set_dominaria = SetORM(name='Dominaria')
+        async with session.begin():
+            # Вставка тестовых данных в таблицу sets
+            sets = [
+                SetORM(name="Zendikar Rising"),
+                SetORM(name="Kaldheim"),
+                SetORM(name="Strixhaven: School of Mages")
+            ]
 
+            # Вставка тестовых данных в таблицу tournaments
+            tournaments = [
+                TournamentORM(name="Zendikar Championship", date=datetime(2024, 12, 5)),
+                TournamentORM(name="Kaldheim Open", date=datetime(2024, 11, 20))
+            ]
 
-        set_phirexya = SetORM(name='Phirexya')
-        set_eldraine = SetORM(name='Eldraine')
-        await session.add_all(Zontik_tournament, Brukwa_tournament, El_tournament, set_phirexya, set_dominaria, set_eldraine)
+            # Добавление данных в сессию
+            session.add_all(sets)
+            session.add_all(tournaments)
+
         await session.commit()
+        print("Таблицы созданы и тестовые данные добавлены.")
 
-if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print('Бот выключен')
+if __name__ == "__main__":
+    asyncio.run(create_and_populate_db())
+
+
