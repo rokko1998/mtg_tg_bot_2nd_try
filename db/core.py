@@ -12,7 +12,7 @@ class AsyncCore:
     async def add_user(tg_id: int, username: str) -> None:
         """Добавляет нового пользователя в базу данных."""
         async with async_session() as session:
-            await session.execute(insert(UserORM).values(tg_id=tg_id, username=username).prefix_with("OR IGNORE"))
+            await session.execute(insert(UserORM).values(tg_id=tg_id, username=username))
             await session.commit()
 
     @staticmethod

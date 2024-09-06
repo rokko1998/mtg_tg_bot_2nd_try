@@ -13,7 +13,7 @@ from routers.admin_router import admin_router
 load_dotenv()
 
 TOKEN = getenv('TOKEN')
-OWNER_ID = getenv('ADMIN_ID')
+OWNER_ID = getenv('OWNER_ID')
 
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
