@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from datetime import datetime, timedelta
 from db.models import *
 
+
 class AsyncCore:
     """Добавление пользователя"""
     @staticmethod

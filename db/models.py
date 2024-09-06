@@ -229,7 +229,7 @@ async def create_and_populate_db():
             session.add_all(tournaments)
 
         await session.commit()
-        print("Таблицы созданы и тестовые данные добавлены.")
+        print(f'\033[92m Таблицы созданы и тестовые данные добавлены. \033[0m')
 
 if __name__ == "__main__":
     asyncio.run(create_and_populate_db())
