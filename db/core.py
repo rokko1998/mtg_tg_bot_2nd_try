@@ -54,6 +54,7 @@ class AsyncCore:
             tournaments = result.scalars().all()
             return tournaments
     @staticmethod
+    @staticmethod
     async def get_start_stat(user_id: int) -> Dict[str, any]:
         """Возвращает данные пользователя, включая количество побед и винрейт."""
         async with async_session() as session:
@@ -62,7 +63,10 @@ class AsyncCore:
                 logger.info('Запущена функция получения стартовой статистики пользователя')
                 stmt = select(
                     UserORM.username,
-                    func.sum(case([(MatchORM.winner_id == UserORM.id, 1)], else_=0)).label('wins'),
+                    func.sum(case(
+                        (MatchORM.winner_id == UserORM.id, 1),
+                        else_=0
+                    )).label('wins'),
                     func.count().label('total_matches')
                 ).outerjoin(
                     MatchORM, (MatchORM.player1_id == user_id) | (MatchORM.player2_id == user_id)
@@ -75,9 +79,9 @@ class AsyncCore:
                 if data:
                     username, wins, total_matches = data
                     return {
-                        'username': username,
-                        'wins': wins if wins is not None else 0,
-                        'total_matches': total_matches if total_matches is not None else 0
+                        'username': username or 'Unknown',
+                        'wins': wins or 0,
+                        'total_matches': total_matches or 0
                     }
                 else:
                     return {
@@ -85,6 +89,7 @@ class AsyncCore:
                         'wins': 0,
                         'total_matches': 0
                     }
+
 
 
 
