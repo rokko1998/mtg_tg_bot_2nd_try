@@ -17,7 +17,8 @@ user_router = Router()
 @user_router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     """Хендлер команды /start"""
-    await AsyncCore.add_user(message.from_user.id, message.from_user.username)
+    user = await AsyncCore.add_user(message.from_user.id, message.from_user.username)
+    logger.info(f'Пользователь {str(user)} ввел команду старт')
     await state.clear()
     #TODO sts = AsyncCore.get_main_stat(message.from_user.id) -> Dict
     # msg = generate_main_stat(sts: Dict) -> str

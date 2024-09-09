@@ -1,16 +1,17 @@
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.dialects.sqlite import insert
+from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from datetime import datetime, timedelta
 from db.models import *
 from sqlalchemy.exc import IntegrityError
+from logger_conf import logger
+
+
 
 class AsyncCore:
-    from sqlalchemy.exc import IntegrityError
-
     @staticmethod
-    async def add_user(tg_id: int, username: str) -> UserORM:
+    async def add_user(tg_id: int, username: str) -> Optional[UserORM]:
         """Добавляет нового пользователя в базу данных."""
         async with async_session() as session:
             try:
@@ -18,6 +19,8 @@ class AsyncCore:
                 new_user = UserORM(tg_id=tg_id, username=username)
                 session.add(new_user)
                 await session.commit()
+                await session.refresh(new_user)  # Обновляем объект после коммита
+                logger.info(f'Зарегистрирован новый пользователь {str(new_user)}')
                 return new_user
             except IntegrityError:
                 # Откатываем транзакцию, если пользователь уже существует
@@ -52,10 +55,5 @@ class AsyncCore:
             return tournaments
 
 
-    @staticmethod
-    async def create_tables():
-        """Создание и заполнение временных таблиц"""
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
 
 
