@@ -8,7 +8,9 @@ from aiogram.enums import chat_action
 from db.core import AsyncCore
 from aiogram import Bot
 from kb import start_kb
+import logging
 from utils import *
+from logger_conf import logger
 
 user_router = Router()
 
@@ -23,33 +25,30 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
            f'Добро пожаловать в таверну "Гнутая мишень"!\n'
            f'Здесь ты можешь записаться на драфт в МТГА\n\n'
            f'Твоя статистика:\n'
+           
            f'Количество побед: sts.wins\n'
            f'Винрейт: winrate_text')
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     await message.answer(text=msg, reply_markup=start_kb)
-#
-# @user_router.callback_query(F.data == 'find_game')
-# async def find_game(callback: CallbackQuery, state: FSMContext):
-#     """Хендлер кнопки "Найти игру" главного меню, выводит список турниров этой недели"""
-#     dates = await nearest_weekend()
-#     # print(f"\033[92m{dates}\033[0m")
-#     tournaments = await AsyncCore.upsert_tournaments(dates)
-#     print(f"\033[92m AsyncCore.upsert_tournaments - ok \033[0m")
-#     keyboard = InlineKeyboardBuilder()
-#
-#     for tournament in tournaments:
-#         tournament_id = tournament.id
-#         tournament_name = tournament.name
-#         keyboard.button(
-#             text=f'{tournament_name}',
-#             callback_data=f'tournament_{tournament_id}'
-#         )
-#     keyboard.button(text='Назад', callback_data='back_to_start')
-#
-#     await callback.answer('Выберите турнир')
-#     await state.set_state(FindGame.find_menu)
-#     await callback.message.edit_text('Выберите турнир:', reply_markup=keyboard.adjust(2).as_markup())
-#
+
+@user_router.callback_query(F.data == 'find_game')
+async def find_game(callback: CallbackQuery, state: FSMContext):
+    """Хендлер кнопки "Найти игру" главного меню, выводит список турниров этой недели"""
+    tournaments = await AsyncCore.get_tournaments()
+    keyboard = InlineKeyboardBuilder()
+
+    for tournament in tournaments:
+        tournament_id = tournament.id
+        tournament_name = tournament.name
+        keyboard.button(
+            text=f'{tournament_name}',
+            callback_data=f'tournament_{tournament_id}'
+        )
+    keyboard.button(text='Назад', callback_data='back_to_start')
+
+    await callback.answer('Выберите турнир')
+    await callback.message.edit_text('Выберите турнир:', reply_markup=keyboard.adjust(2).as_markup())
+
 #
 # # Хендлер кнопки "Назад" из меню "Найти игру" (выбора из списка турниров)
 # @user_router.callback_query(F.data == 'back_to_start')

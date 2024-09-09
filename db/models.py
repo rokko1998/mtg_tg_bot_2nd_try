@@ -1,6 +1,5 @@
 from datetime import datetime
 import enum
-import logging
 import asyncio
 from sqlalchemy import BigInteger, ForeignKey, func, String, Integer, DateTime, Enum, UniqueConstraint, Index, insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, Relationship, mapped_column
@@ -12,6 +11,7 @@ from dotenv import load_dotenv
 from os import getenv
 
 load_dotenv()
+
 DB_USER = getenv('DB_USER')
 DB_PASS = getenv('DB_PASS')
 DB_HOST = getenv('DB_HOST')
@@ -21,6 +21,7 @@ DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{D
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 async_session = async_sessionmaker(engine)
+
 
 
 

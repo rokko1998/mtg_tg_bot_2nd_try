@@ -6,6 +6,9 @@ import logging
 import ast
 from dotenv import load_dotenv
 from os import getenv
+from logger_conf import start_listener, stop_listener, logger  # Импортируем listener и логгер
+
+
 from routers.user_router import user_router
 from routers.admin_router import admin_router
 
@@ -33,8 +36,12 @@ async def main():
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO) # Подключение логирования
+    logging.basicConfig(level=logging.INFO)
+    start_listener()  # Запускаем слушателя очереди
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print('Бот выключен')
+        logger.warning("Бот был остановлен пользователем.")
+    finally:
+        stop_listener()  # Останавливаем слушателя очереди
+        logger.info("Слушатель логов остановлен.")
