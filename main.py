@@ -40,6 +40,7 @@ if __name__ == '__main__':
     start_listener()  # Запускаем слушателя очереди
     try:
         asyncio.run(main())
+        logger.info("Бот запущен!")
     except KeyboardInterrupt:
         logger.warning("Бот был остановлен пользователем.")
     finally:

@@ -1,7 +1,7 @@
 from typing import Optional
-
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload, joinedload
+from typing import Dict
+from sqlalchemy import select, case
+from sqlalchemy.orm import selectinload, joinedload, outerjoin
 from datetime import datetime, timedelta
 from db.models import *
 from sqlalchemy.exc import IntegrityError
@@ -53,7 +53,38 @@ class AsyncCore:
 
             tournaments = result.scalars().all()
             return tournaments
+    @staticmethod
+    async def get_start_stat(user_id: int) -> Dict[str, any]:
+        """Возвращает данные пользователя, включая количество побед и винрейт."""
+        async with async_session() as session:
+            async with session.begin():
+                # Запрос для получения данных пользователя и статистики матчей
+                logger.info('Запущена функция получения стартовой статистики пользователя')
+                stmt = select(
+                    UserORM.username,
+                    func.sum(case([(MatchORM.winner_id == UserORM.id, 1)], else_=0)).label('wins'),
+                    func.count().label('total_matches')
+                ).outerjoin(
+                    MatchORM, (MatchORM.player1_id == user_id) | (MatchORM.player2_id == user_id)
+                ).where(UserORM.id == user_id).group_by(UserORM.username)
 
+                result = await session.execute(stmt)
+                data = result.fetchone()
+
+                # Обработка результата
+                if data:
+                    username, wins, total_matches = data
+                    return {
+                        'username': username,
+                        'wins': wins if wins is not None else 0,
+                        'total_matches': total_matches if total_matches is not None else 0
+                    }
+                else:
+                    return {
+                        'username': 'Unknown',
+                        'wins': 0,
+                        'total_matches': 0
+                    }
 
 
 

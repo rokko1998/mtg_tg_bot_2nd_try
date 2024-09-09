@@ -9,8 +9,9 @@ from db.core import AsyncCore
 from aiogram import Bot
 from kb import start_kb
 import logging
-from utils import *
+from utils import generate_start_stat
 from logger_conf import logger
+from state import FindGame
 
 user_router = Router()
 
@@ -20,15 +21,11 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     user = await AsyncCore.add_user(message.from_user.id, message.from_user.username)
     logger.info(f'Пользователь {str(user)} ввел команду старт')
     await state.clear()
-    #TODO sts = AsyncCore.get_main_stat(message.from_user.id) -> Dict
-    # msg = generate_main_stat(sts: Dict) -> str
-    msg = (f'Привет, sts.username,\n'
-           f'Добро пожаловать в таверну "Гнутая мишень"!\n'
-           f'Здесь ты можешь записаться на драфт в МТГА\n\n'
-           f'Твоя статистика:\n'
-           
-           f'Количество побед: sts.wins\n'
-           f'Винрейт: winrate_text')
+    await state.set_state(FindGame.find_menu)
+    await state.update_data(user_id=str(user.id))
+    sts = await AsyncCore.get_start_stat(user.id)
+    logger.info(f'Пользователь {str(user)} ввел команду старт')
+    msg = await generate_start_stat(sts)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     await message.answer(text=msg, reply_markup=start_kb)
 

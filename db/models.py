@@ -64,7 +64,7 @@ class UserORM(Base):
     mtg_accounts: Mapped[List["MTGAccountORM"]] = Relationship(back_populates="user", cascade="all, delete-orphan")
     votes: Mapped[List["VoteORM"]] = Relationship(back_populates="user", cascade="all, delete-orphan")
     def __str__(self):
-        return f'username= {self.username}\ntg_id= {self.tg_id}'
+        return f'username = {self.username}, tg_id = {self.tg_id}'
 
 class TournamentORM(Base):
     """Таблица турниров"""
