@@ -32,17 +32,17 @@ class AsyncCore:
                 )
                 return existing_user.scalar_one()
 
-
     @staticmethod
     async def get_tournaments() -> List:
         """Возвращает список всех турниров, которые проходят на этой неделе"""
         async with async_session() as session:
-            # Получаем текущую дату и время
             now = datetime.now()
 
-            # Определяем начало и конец текущей недели
-            start_of_week = now - timedelta(days=now.weekday())
-            end_of_week = start_of_week + timedelta(days=6)
+            # Определяем начало и конец недели
+            start_of_week = datetime.combine(now - timedelta(days=now.weekday()), datetime.min.time())
+            end_of_week = datetime.combine(start_of_week + timedelta(days=6), datetime.max.time())
+
+            # print(f"Start of week: {start_of_week}, End of week: {end_of_week}") # Вывод для отладки
 
             # Выполняем запрос на выборку турниров, которые начинаются на этой неделе
             result = await session.execute(
@@ -53,14 +53,13 @@ class AsyncCore:
 
             tournaments = result.scalars().all()
             return tournaments
-    @staticmethod
+
     @staticmethod
     async def get_start_stat(user_id: int) -> Dict[str, any]:
         """Возвращает данные пользователя, включая количество побед и винрейт."""
         async with async_session() as session:
             async with session.begin():
                 # Запрос для получения данных пользователя и статистики матчей
-                logger.info('Запущена функция получения стартовой статистики пользователя')
                 stmt = select(
                     UserORM.username,
                     func.sum(case(
@@ -84,12 +83,36 @@ class AsyncCore:
                         'total_matches': total_matches or 0
                     }
                 else:
+                    logger.warning(f'Ошибка при получении данных пользователя {user_id}')
                     return {
                         'username': 'Unknown',
                         'wins': 0,
                         'total_matches': 0
                     }
 
+    @staticmethod
+    async def add_tournament(name: str, date: str) -> Optional[TournamentORM]:
+        """Добавляет новый турнир в базу данных."""
+        async with async_session() as session:
+            try:
+                # Преобразуем строку даты в объект datetime
+                tournament_date = datetime.strptime(date, "%d.%m.%y %H.%M")
 
+                # Создаем новый объект турнира
+                new_tournament = TournamentORM(
+                    name=name,
+                    date=tournament_date,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
 
-
+                session.add(new_tournament)
+                await session.commit()
+                await session.refresh(new_tournament)  # Обновляем объект после коммита
+                logger.info(f'Создан новый турнир {str(new_tournament)}')
+                return new_tournament
+            except IntegrityError:
+                # Откатываем транзакцию, если произошла ошибка
+                await session.rollback()
+                logger.error(f'Ошибка при добавлении турнира с именем {name}')
+                return None

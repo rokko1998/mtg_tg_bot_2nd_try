@@ -20,3 +20,9 @@ class Stats(StatesGroup):
     stats_menu = State()
     manage_accounts = State()
     account_stats = State()
+
+class Add_tnmt(StatesGroup):
+    tnmt_date = State()
+    tnmt_name = State()
+
+

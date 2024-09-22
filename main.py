@@ -7,6 +7,7 @@ import ast
 from dotenv import load_dotenv
 from os import getenv
 from logger_conf import start_listener, stop_listener, logger  # Импортируем listener и логгер
+from mw import LogUserActionsMiddleware
 
 
 from routers.user_router import user_router
@@ -21,7 +22,8 @@ OWNER_ID = getenv('OWNER_ID')
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
-
+dp.message.middleware(LogUserActionsMiddleware())
+dp.callback_query.middleware(LogUserActionsMiddleware())
 
 async def start_bot(bot: Bot):
     await bot.send_message(chat_id=OWNER_ID, text='Бот запущен!')
@@ -42,7 +44,7 @@ if __name__ == '__main__':
         asyncio.run(main())
         logger.info("Бот запущен!")
     except KeyboardInterrupt:
-        logger.warning("Бот был остановлен пользователем.")
+        logger.warning(f"Бот был остановлен пользователем.\n\n\n")
     finally:
         stop_listener()  # Останавливаем слушателя очереди
         logger.info("Слушатель логов остановлен.")
