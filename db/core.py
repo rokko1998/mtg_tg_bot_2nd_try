@@ -1,4 +1,5 @@
 from typing import Optional
+from sqlalchemy import func
 from typing import Dict
 from sqlalchemy import select, case
 from sqlalchemy.orm import selectinload, joinedload, outerjoin
@@ -30,7 +31,9 @@ class AsyncCore:
                 existing_user = await session.execute(
                     select(UserORM).where(UserORM.tg_id == tg_id)
                 )
-                return existing_user.scalar_one()
+                user = existing_user.scalar_one()
+                logger.info(f'Пользователь {str(user)} авторизован')
+                return user
 
     @staticmethod
     async def get_tournaments() -> List:
@@ -49,6 +52,7 @@ class AsyncCore:
                 select(TournamentORM)
                 .where(TournamentORM.date >= start_of_week)
                 .where(TournamentORM.date <= end_of_week)
+
             )
 
             tournaments = result.scalars().all()
@@ -116,3 +120,118 @@ class AsyncCore:
                 await session.rollback()
                 logger.error(f'Ошибка при добавлении турнира с именем {name}')
                 return None
+
+    @staticmethod
+    async def get_tournament_data(tournament_id: int) -> Optional[dict]:
+        """Получает информацию о турнире по его ID."""
+        async with async_session() as session:
+            result = await session.execute(
+                select(TournamentORM)
+                .where(TournamentORM.id == tournament_id)
+                .options(selectinload(TournamentORM.registrations), selectinload(TournamentORM.votes))
+            )
+            tournament = result.scalar_one_or_none()
+            if not tournament:
+                return None
+
+            return {
+                'id': tournament.id,
+                'name': tournament.name,
+                'status': tournament.status.value,
+                'date': tournament.date,
+                'set': tournament.set,
+                'players': len(tournament.registrations)  # Количество игроков
+            }
+
+    @staticmethod
+    async def is_user_registered_in_tournament(tournament_id: int, user_id: int) -> bool:
+        """Проверяет, зарегистрирован ли пользователь в турнире."""
+        async with async_session() as session:
+            result = await session.execute(
+                select(RegistrationORM)
+                .where(RegistrationORM.tournament_id == tournament_id)
+                .where(RegistrationORM.user_id == user_id)
+                .where(RegistrationORM.status == RegStatus.CONFIRMED)
+            )
+            return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def get_tournament_players(tournament_id: int) -> List[dict]:
+        """Получает список всех зарегистрированных игроков для конкретного турнира."""
+        async with async_session() as session:
+            result = await session.execute(
+                select(UserORM.id, UserORM.username, DeckORM.id.label('deck_id'))
+                .join(RegistrationORM, RegistrationORM.user_id == UserORM.id)
+                .outerjoin(DeckORM, (DeckORM.user_id == UserORM.id) & (DeckORM.tournament_id == tournament_id))
+                .where(RegistrationORM.tournament_id == tournament_id)
+                .where(RegistrationORM.status == RegStatus.CONFIRMED)
+                .order_by(UserORM.username)
+            )
+
+            players = result.all()
+            return [{'user_id': player.id, 'username': player.username, 'deck': player.deck_id is not None} for player
+                    in players]
+
+    @staticmethod
+    async def get_set_votes(tournament_id: int) -> List[dict]:
+        """Получает информацию о количестве голосов за каждый сет для конкретного турнира."""
+        async with async_session() as session:
+            result = await session.execute(
+                select(SetORM.name, func.count(VoteORM.id).label('votes'))
+                .join(VoteORM, VoteORM.set_id == SetORM.id)
+                .where(VoteORM.tournament_id == tournament_id)
+                .group_by(SetORM.name)
+                .order_by(func.count(VoteORM.id).desc())
+            )
+
+            sets = result.all()
+            return [{'name': set_data.name, 'votes': set_data.votes} for set_data in sets]
+
+    @staticmethod
+    async def get_tournament_matches(tournament_id: int) -> List[dict]:
+        """Получает список всех матчей для конкретного турнира, сгруппированных по раундам."""
+        async with async_session() as session:
+            result = await session.execute(
+                select(
+                    MatchORM.round,
+                    UserORM.username.label('player1'),
+                    UserORM.username.label('player2'),
+                    MatchORM.player1_score,
+                    MatchORM.player2_score,
+                    func.coalesce(UserORM.username, 'N/A').label('winner')
+                )
+                .join(UserORM, UserORM.id == MatchORM.player1_id)
+                .join(UserORM, UserORM.id == MatchORM.player2_id)
+                .join(UserORM, UserORM.id == MatchORM.winner_id, isouter=True)
+                .where(MatchORM.tournament_id == tournament_id)
+                .order_by(MatchORM.round)
+            )
+
+            matches = result.all()
+            return [
+                {
+                    'round': match.round,
+                    'player1': match.player1,
+                    'player2': match.player2,
+                    'player1_score': match.player1_score,
+                    'player2_score': match.player2_score,
+                    'winner': match.winner
+                }
+                for match in matches
+            ]
+
+    @staticmethod
+    async def get_tournament_results(tournament_id: int) -> List[dict]:
+        """Получает итоговую таблицу результатов для завершенного турнира."""
+        async with async_session() as session:
+            result = await session.execute(
+                select(UserORM.username, func.rank().over(order_by=func.count(MatchORM.id)).label('position'))
+                .join(RegistrationORM, RegistrationORM.user_id == UserORM.id)
+                .join(MatchORM, (MatchORM.player1_id == UserORM.id) | (MatchORM.player2_id == UserORM.id))
+                .where(RegistrationORM.tournament_id == tournament_id)
+                .group_by(UserORM.username)
+                .order_by(func.count(MatchORM.id).desc())
+            )
+
+            results = result.all()
+            return [{'username': res.username, 'position': res.position} for res in results]

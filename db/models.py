@@ -4,7 +4,7 @@ import asyncio
 from sqlalchemy import BigInteger, ForeignKey, func, String, Integer, DateTime, Enum, UniqueConstraint, Index, insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, Relationship, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from dotenv import load_dotenv
@@ -72,6 +72,7 @@ class TournamentORM(Base):
 
     id: Mapped[int_pk]
     name: Mapped[str_256]
+    set: Mapped[Optional[str_256]]
     status = mapped_column(Enum(TournamentStatus), default=TournamentStatus.PLANNED)
     created_at: Mapped[created_at]
     updated_at: Mapped[updated_at]
@@ -207,7 +208,8 @@ class MatchORM(Base):
 async def create_and_populate_db():
     """Создание всех таблиц и добавление тестовых данных"""
     async with engine.begin() as conn:
-        # Использование run_sync для создания таблиц
+        # Использование run_sync для пересоздания таблиц
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     async with async_session() as session:
@@ -221,8 +223,8 @@ async def create_and_populate_db():
 
             # Вставка тестовых данных в таблицу tournaments
             tournaments = [
-                TournamentORM(name="Zendikar Championship", date=datetime(2024, 12, 5)),
-                TournamentORM(name="Kaldheim Open", date=datetime(2024, 11, 20))
+                TournamentORM(name="Zendikar Championship", date=datetime(2024, 9, 30)),
+                TournamentORM(name="Kaldheim Open", date=datetime(2024, 9, 30))
             ]
 
             # Добавление данных в сессию

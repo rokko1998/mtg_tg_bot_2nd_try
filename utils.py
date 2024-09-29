@@ -1,4 +1,10 @@
-from typing import Dict
+from typing import Dict, List
+
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from db.core import AsyncCore
+
 
 async def generate_start_stat(sts: Dict[str, any]) -> str:
     """Возвращает текст для сообщения со статистикой пользователя для команды старт"""
@@ -22,3 +28,201 @@ async def generate_start_stat(sts: Dict[str, any]) -> str:
         f"Винрейт: {winrate_text}\n"
     )
     return message
+
+async def handle_planned_tournament(
+    tournament_data: dict,
+    user_in_tournament: bool,
+    tournament_players: List[dict],
+    set_votes: List[dict],
+    user_id: int
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Формирует сообщение и клавиатуру для турнира в статусе PLANNED.
+
+    :param tournament_data: Данные о турнире.
+    :param user_in_tournament: Указывает, зарегистрирован ли пользователь в турнире.
+    :param tournament_players: Список всех зарегистрированных игроков турнира.
+    :param set_votes: Список голосов за сет.
+    :param user_id: ID текущего пользователя.
+    :return: Сообщение и клавиатура для отправки пользователю.
+    """
+    # Формирование сообщения о турнире с использованием HTML-разметки
+    message = f"<b>{tournament_data['name']}</b>\n" \
+              f"> Статус турнира: {tournament_data['status']}\n" \
+              f"Дата проведения: {tournament_data['date'].strftime('%d.%m.%Y')}\n" \
+              f"Кол-во игроков: {len(tournament_players)}\n\n"
+
+    # Список игроков
+    message += "Список всех игроков данного турнира:\n"
+    for index, player in enumerate(tournament_players, start=1):
+        player_text = f"{index}. {player['username']}"
+        if user_in_tournament and player['user_id'] == user_id:
+            player_text = f"<b>{player_text}</b>"  # Выделение текущего пользователя жирным.
+        message += f"{player_text}\n"
+
+    # Голосование за сет
+    message += "\nГолосование за сет:\n"
+    set_votes_sorted = sorted(set_votes, key=lambda x: x['votes'], reverse=True)[:3]  # Топ-3 сета
+    for set_info in set_votes_sorted:
+        message += f"{set_info['name']} - {set_info['votes']} голосов\n"
+
+
+
+    # Клавиатура
+    # Создание клавиатуры
+    keyboard = InlineKeyboardBuilder()
+
+    # Добавление кнопок в зависимости от состояния регистрации пользователя
+    if user_in_tournament:
+        keyboard.row(
+            InlineKeyboardButton(text="Отменить регистрацию", callback_data=f"unregister_{tournament_data['id']}"),
+            InlineKeyboardButton(text="Изменить выбор сета", callback_data=f"change_set_{tournament_data['id']}")
+        )
+    else:
+        keyboard.add(
+            InlineKeyboardButton(text="Зарегистрироваться", callback_data=f"register_{tournament_data['id']}")
+        )
+
+    # Добавление кнопок, которые отображаются всегда
+    keyboard.row(
+        InlineKeyboardButton(text="Обновить", callback_data=f"refresh_{tournament_data['id']}"),
+        InlineKeyboardButton(text="Назад", callback_data="back")
+    )
+
+    return message, keyboard.as_markup()
+
+async def handle_upcoming_tournament(
+    tournament_data: dict,
+    user_in_tournament: bool,
+    tournament_players: List[dict],
+    user_id: int
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Формирует сообщение и клавиатуру для турнира в статусе UPCOMING.
+
+    :param tournament_data: Данные о турнире.
+    :param user_in_tournament: Указывает, зарегистрирован ли пользователь в турнире.
+    :param tournament_players: Список всех зарегистрированных игроков турнира.
+    :param user_id: ID текущего пользователя.
+    :return: Сообщение и клавиатура для отправки пользователю.
+    """
+    # Формирование сообщения о турнире с использованием HTML-разметки
+    message = f"<b>{tournament_data['name']}</b>\n" \
+              f"> Статус турнира: {tournament_data['status']}\n" \
+              f"Сет: {tournament_data['set']}\n\n"
+
+    # Список игроков
+    message += "Список всех игроков данного турнира:\n"
+    for index, player in enumerate(tournament_players, start=1):
+        player_status = "Указана колода" if player['deck'] else "Колода не указана"
+        player_text = f"{index}. {player['username']} - {player_status}"
+        if user_in_tournament and player['user_id'] == user_id:
+            player_text = f"<b>{player_text}</b>"  # Выделение текущего пользователя жирным.
+        message += f"{player_text}\n"
+
+
+    # Создание клавиатуры
+    keyboard = InlineKeyboardBuilder()
+
+    # Добавление кнопок в зависимости от состояния колоды игрока
+    if user_in_tournament:
+        if not player['deck']:
+            keyboard.add(InlineKeyboardButton(text="Зарегистрировать колоду",
+                                              callback_data=f"register_deck_{tournament_data['id']}"))
+        else:
+            keyboard.add(
+                InlineKeyboardButton(text="Изменить колоду", callback_data=f"change_deck_{tournament_data['id']}"))
+
+    # Добавление кнопок, которые отображаются всегда
+    keyboard.row(
+        InlineKeyboardButton(text="Обновить", callback_data=f"refresh_{tournament_data['id']}"),
+        InlineKeyboardButton(text="Назад", callback_data="back")
+    )
+
+    # Возвращение сообщения и клавиатуры в формате InlineKeyboardMarkup
+    return message, keyboard.as_markup()
+
+
+async def handle_ongoing_tournament(
+        tournament_data: dict,
+        user_in_tournament: bool,
+        tournament_id: int,
+        user_id: int
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Формирует сообщение и клавиатуру для турнира в статусе ONGOING.
+
+    :param tournament_data: Данные о турнире.
+    :param user_in_tournament: Указывает, зарегистрирован ли пользователь в турнире.
+    :param tournament_id: ID текущего турнира.
+    :param user_id: ID текущего пользователя.
+    :return: Сообщение и клавиатура для отправки пользователю.
+    """
+    # Получение текущих матчей турнира
+    matches = await AsyncCore.get_tournament_matches(tournament_id)
+
+    # Формирование сообщения о турнире с использованием HTML-разметки
+    message = f"<b>{tournament_data['name']}</b>\n" \
+              f"> Статус турнира: {tournament_data['status']}\n" \
+              f"Сет: {tournament_data['set']}\n\n"
+
+    message += "Текущие матчи:\n"
+    for match in matches:
+        message += f"{match['player1']} VS {match['player2']} - результат матча: {match['player1_score']} : {match['player2_score']}\n"
+
+
+    # Создание клавиатуры
+    keyboard = InlineKeyboardBuilder()
+
+    # Добавление кнопок в клавиатуру
+    keyboard.row(
+        InlineKeyboardButton(text="Внести результаты матча", callback_data=f"enter_results_{tournament_id}"),
+        InlineKeyboardButton(text="Обновить", callback_data=f"refresh_{tournament_id}")
+    )
+    keyboard.add(InlineKeyboardButton(text="Назад", callback_data="back"))
+
+    return message, keyboard.as_markup()
+
+
+async def handle_completed_tournament(
+        tournament_data: dict,
+        tournament_players: List[dict]
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Формирует сообщение и клавиатуру для турнира в статусе COMPLETED.
+
+    :param tournament_data: Данные о турнире.
+    :param tournament_players: Список всех игроков турнира.
+    :return: Сообщение и клавиатура для отправки пользователю.
+    """
+    message = f"<b>{tournament_data['name']}</b>\n"
+    message += f"> Статус турнира: {tournament_data['status']}\n"
+    message += f"Сет: {tournament_data['set']}\n"
+
+    message += "Таблица результатов:\n"
+    for index, player in enumerate(tournament_players, start=1):
+        message += f"{index}. {player['username']}\n"
+
+    # Клавиатура
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="Назад", callback_data="back"))
+
+    return message, keyboard.as_markup()
+
+async def handle_cancelled_tournament(
+    tournament_data: dict
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Формирует сообщение и клавиатуру для турнира в статусе CANCELLED.
+
+    :param tournament_data: Данные о турнире.
+    :return: Сообщение и клавиатура для отправки пользователю.
+    """
+    message = f"<b>{tournament_data['name']}</b>\n"
+    message += f"> Статус турнира: {tournament_data['status']}\n"
+
+    # Клавиатура
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text="Назад", callback_data="back"))
+
+    return message, keyboard.as_markup()

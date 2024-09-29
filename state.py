@@ -1,7 +1,7 @@
 from aiogram.fsm.state import StatesGroup, State
 
 
-class FindGame(StatesGroup):
+class Tnmts(StatesGroup):
     start_menu = State()
     find_menu = State()
     tournament_info = State()

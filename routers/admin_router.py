@@ -56,21 +56,4 @@ async def add_tnmt(message: Message, state: FSMContext):
     await state.clear()
 
 
-# @admin_router.callback_query(Add_tnmt.new_tnmt)
-# async def set_tnmt_date(callback: CallbackQuery, state: FSMContext):
-#     """Хендлер Даты и времени проведения турнира"""
-#     await state.update_data(date=callback)
-#     keyboard = InlineKeyboardBuilder()
-#
-#     for tournament in tournaments:
-#         tournament_id = tournament.id
-#         tournament_name = tournament.name
-#         keyboard.button(
-#             text=f'{tournament_name}',
-#             callback_data=f'tournament_{tournament_id}'
-#         )
-#     keyboard.button(text='Назад', callback_data='back_to_start')
-#
-#     await callback.answer('Выберите турнир')
-#     await callback.message.edit_text('Выберите турнир:', reply_markup=keyboard.adjust(2).as_markup())
 

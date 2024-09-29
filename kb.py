@@ -2,7 +2,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 
 
 start_kb = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Найти игру', callback_data='find_game'),
-     InlineKeyboardButton(text='Мои игры', callback_data='my_games')],
-    [InlineKeyboardButton(text='Статистика', callback_data='statistics')]
+    [InlineKeyboardButton(text='Турниры', callback_data='tnmts'),
+     InlineKeyboardButton(text='Статистика', callback_data='my_games')],
+    [InlineKeyboardButton(text='Настройки', callback_data='statistics')]
 ])
