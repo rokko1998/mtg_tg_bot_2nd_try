@@ -4,7 +4,6 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import chat_action
-# from state import FindGame,MyGames, Stats
 from db.core import AsyncCore
 from aiogram import Bot
 from kb import start_kb
@@ -24,7 +23,8 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     await state.update_data(user_id=str(user.id))
     sts = await AsyncCore.get_start_stat(user.id)
     msg = await generate_start_stat(sts)
-    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+    await message.bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+    # await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     await message.answer(text=msg, reply_markup=start_kb)
 
 
@@ -47,29 +47,61 @@ async def find_game(callback: CallbackQuery, state: FSMContext):
     await callback.answer('Выберите турнир')
     await callback.message.edit_text('Выберите турнир:', reply_markup=keyboard.adjust(2).as_markup())
 
+@user_router.callback_query(F.data.startswith('register_'))
+@user_router.callback_query(F.data.startswith('change_set_'))
+async def change_tournament_set(callback: CallbackQuery, state: FSMContext):
+    tnmt_id = callback.data.split("_")[-1]
+    await state.update_data(tnmt_id=str(tnmt_id))
+    sets = await AsyncCore.get_sets()
+    keyboard = InlineKeyboardBuilder()
+    for set in sets:
+        keyboard.button(text=set.name, callback_data=f'set_{set.id}')
+    keyboard.button(text='назад', callback_data=f'Back_{set.id}')
+    await callback.message.edit_text('Выберите сет:', reply_markup=keyboard.adjust(3).as_markup())
 
-@user_router.callback_query(F.data.startswith('tournament_'))
+
+@user_router.callback_query(Tnmts.find_menu)
+#@user_router.callback_query(F.data.startswith('tournament_'))
 async def get_tournament_info(callback: CallbackQuery, state: FSMContext):
-    """Хендлер кнопки "Турнир #id" в меню "Найти игру", выводит инфу по турниру и разные кнопки."""
+    """Хендлер трнира, выводит инфу по турниру и разные кнопки."""
 
-    # Извлечение ID турнира из callback_data и сохранение его в состоянии.
-    tournament_id = int(callback.data.split("_")[-1])
-    await state.update_data(tournament_id=tournament_id)
-    await state.set_state(Tnmts.find_menu)
+    state_data = await state.get_data()
+    user_id = int(state_data.get('user_id'))
 
-    # Получение ID пользователя из состояния
-    data = await state.get_data()
-    user_id = int(data.get('user_id'))
+    id = int(callback.data.split("_")[-1])
+    prefix = callback.data.split("_")[0]
+    if prefix == 'tournament':
+        tnmt_id = id
+        await state.update_data(tnmt_id=tnmt_id)
+
+    state_data = await state.get_data()
+    tnmt_id = int(state_data.get('tnmt_id'))
+
+    if prefix == 'set':
+        set = id
+        register = await AsyncCore.reg_vote(tnmt_id, user_id, set)
+        if register == True:
+            await AsyncCore.register_user_to_tnmt(tnmt_id, user_id)
+
+    if prefix == 'reg':
+        await AsyncCore.register_user_to_tnmt(tnmt_id, user_id)
+
+    if prefix == 'unregister':
+        tnmt_id = int(state_data.get('tnmt_id'))
+        await AsyncCore.unregister_user_to_tnmt(tnmt_id, user_id)
+
 
     # Получение данных о турнире и проверка регистрации пользователя
-    tournament_data = await AsyncCore.get_tournament_data(tournament_id)
-    user_in_tournament = await AsyncCore.is_user_registered_in_tournament(tournament_id, user_id)
-    tournament_players = await AsyncCore.get_tournament_players(tournament_id)
-    set_votes = await AsyncCore.get_set_votes(tournament_id)
+    tournament_data = await AsyncCore.get_tournament_data(tnmt_id)
+    user_in_tournament = await AsyncCore.is_user_registered_in_tournament(tnmt_id, user_id)
+    tournament_players = await AsyncCore.get_tournament_players(tnmt_id)
+    set_votes = await AsyncCore.get_set_votes(tnmt_id)
 
     if not tournament_data:
+        logger.error(f'Турнир не найден или данные недоступны.')
         await callback.message.edit_text("Турнир не найден или данные недоступны.")
         return
+
 
     # Вызов функции формирования сообщения и кнопок в зависимости от статуса турнира
     tournament_status = tournament_data['status']
@@ -79,19 +111,19 @@ async def get_tournament_info(callback: CallbackQuery, state: FSMContext):
         message_text, keyboard = await handle_planned_tournament(
             tournament_data, user_in_tournament, tournament_players, set_votes, user_id
         )
-    elif tournament_status == "UPCOMING":
+    elif tournament_status == "upcoming":
         message_text, keyboard = await handle_upcoming_tournament(
             tournament_data, user_in_tournament, tournament_players, user_id
         )
-    elif tournament_status == "ONGOING":
+    elif tournament_status == "ongoing":
         message_text, keyboard = await handle_ongoing_tournament(
-            tournament_data, user_in_tournament, tournament_id, user_id
+            tournament_data, user_in_tournament, tnmt_id, user_id
         )
-    elif tournament_status == "COMPLETED":
+    elif tournament_status == "completed":
         message_text, keyboard = await handle_completed_tournament(
             tournament_data, tournament_players
         )
-    elif tournament_status == "CANCELLED":
+    elif tournament_status == "cancelled":
         message_text, keyboard = await handle_cancelled_tournament(
             tournament_data
         )
@@ -101,3 +133,10 @@ async def get_tournament_info(callback: CallbackQuery, state: FSMContext):
 
     # Отправка или обновление сообщения с клавиатурой.
     await callback.message.edit_text(message_text, reply_markup=keyboard)
+
+
+
+@user_router.callback_query(F.data.startswith('register_'))
+async def tnmt_reg(callback: CallbackQuery, state: FSMContext):
+    """Хендлер кнопки регистрации на турнир"""
+

@@ -23,6 +23,7 @@ class Stats(StatesGroup):
 
 class Add_tnmt(StatesGroup):
     tnmt_date = State()
+    tnmt_set = State()
     tnmt_name = State()
 
 

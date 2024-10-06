@@ -1,13 +1,10 @@
-from typing import Optional
-from sqlalchemy import func
 from typing import Dict
-from sqlalchemy import select, case
+from sqlalchemy import select, case, update
 from sqlalchemy.orm import selectinload, joinedload, outerjoin
 from datetime import datetime, timedelta
 from db.models import *
 from sqlalchemy.exc import IntegrityError
 from logger_conf import logger
-
 
 
 class AsyncCore:
@@ -132,6 +129,7 @@ class AsyncCore:
             )
             tournament = result.scalar_one_or_none()
             if not tournament:
+                logger.warning(f'Ошибка при получении данных турнира # {tournament_id}')
                 return None
 
             return {
@@ -235,3 +233,149 @@ class AsyncCore:
 
             results = result.all()
             return [{'username': res.username, 'position': res.position} for res in results]
+
+    @staticmethod
+    async def register_user_to_tnmt(tnmt_id: int, user_id: int) -> RegistrationORM:
+        """
+        Регистрирует пользователя на турнир.
+
+        Параметры:
+            tnmt_id (int): ID турнира.
+            user_id (int): ID пользователя.
+
+        Возвращает:
+            Optional[UserTournamentORM]: Объект записи пользователя в турнире или None, если произошла ошибка.
+        """
+        async with async_session() as session:
+            try:
+                # Создаем новую запись участия пользователя в турнире
+                new_entry = RegistrationORM(tournament_id=tnmt_id, user_id=user_id)
+                session.add(new_entry)
+                await session.commit()
+                await session.refresh(new_entry)  # Обновляем объект после коммита
+                logger.info(f'Пользователь {user_id} зарегистрирован на турнир {tnmt_id}')
+                return new_entry
+            except IntegrityError:
+                # Откатываем транзакцию, если запись уже существует
+                await session.rollback()
+
+                # Возвращаем существующую запись
+                existing_entry = await session.execute(
+                    select(RegistrationORM).where(
+                        RegistrationORM.tournament_id == tnmt_id,
+                        RegistrationORM.user_id == user_id
+                    )
+                )
+                entry = existing_entry.scalar_one_or_none()
+
+                if entry:
+                    logger.info(f'Пользователь {user_id} уже зарегистрирован на турнир {tnmt_id}')
+                else:
+                    logger.error(f'Ошибка при регистрации пользователя {user_id} на турнир {tnmt_id}')
+
+                return entry
+
+    @staticmethod
+    async def unregister_user_to_tnmt(tnmt_id: int, user_id: int) -> None:
+        """
+        Отменяет регистрацию пользователя на турнир и удаляет голос за сет в этом турнире.
+
+        Параметры:
+            tnmt_id (int): ID турнира.
+            user_id (int): ID пользователя.
+        """
+        async with async_session() as session:
+            try:
+                # Пытаемся найти и удалить запись о регистрации
+                reg_entry = await session.execute(
+                    select(RegistrationORM).where(
+                        RegistrationORM.tournament_id == tnmt_id,
+                        RegistrationORM.user_id == user_id
+                    )
+                )
+                reg_entry = reg_entry.scalar_one_or_none()
+
+                # Пытаемся найти и удалить запись о голосовании за сет
+                vote_entry = await session.execute(
+                    select(VoteORM).where(
+                        VoteORM.tournament_id == tnmt_id,
+                        VoteORM.user_id == user_id
+                    )
+                )
+                vote_entry = vote_entry.scalar_one_or_none()
+
+                # Удаляем записи, если они существуют
+                if reg_entry:
+                    await session.delete(reg_entry)
+                    logger.info(f'Пользователь {user_id} отменил регистрацию на турнир {tnmt_id}')
+
+                if vote_entry:
+                    await session.delete(vote_entry)
+                    logger.info(f'Голос пользователя {user_id} за сет на турнир {tnmt_id} был удален')
+
+                # Коммитим изменения, если было что удалять
+                if reg_entry or vote_entry:
+                    await session.commit()
+
+                # Если записи не было, логируем предупреждение
+                if not reg_entry and not vote_entry:
+                    logger.warning(
+                        f'Записи о регистрации или голосе пользователя {user_id} на турнир {tnmt_id} не найдены')
+
+            except Exception as e:
+                await session.rollback()
+                logger.error(f'Ошибка при отмене регистрации пользователя {user_id} на турнир {tnmt_id}: {e}')
+
+    @staticmethod
+    async def get_sets():
+        async with async_session() as session:
+            result = await session.execute(select(SetORM))
+            return result.scalars().all()
+
+    @staticmethod
+    async def reg_vote(tnmt_id: int, user_id: int, set_id: int) -> bool:
+        """
+        Регистрация или обновление голоса за сет в турнире.
+
+        Args:
+            tnmt_id (int): ID турнира, в котором голосует пользователь.
+            user_id (int): ID пользователя, голосующего за сет.
+            set_id (int): ID сета, за который отдан голос.
+
+        Returns:
+            bool: True, если голос был зарегистрирован впервые. False, если голос был обновлен.
+        """
+        async with async_session() as session:
+            async with session.begin():
+                # Проверяем, существует ли уже голос пользователя за сет в этом турнире
+                existing_vote_query = await session.execute(
+                    select(VoteORM).where(
+                        VoteORM.user_id == user_id,
+                        VoteORM.tournament_id == tnmt_id
+                    )
+                )
+                existing_vote = existing_vote_query.scalar_one_or_none()
+
+                if existing_vote:
+                    # Если голос существует, обновляем сет
+                    existing_vote.set_id = set_id
+                    await session.commit()
+                    logger.info(f'Обновлен голос пользователя {user_id} на сет {set_id} в турнире {tnmt_id}.')
+                    return False
+                else:
+                    # Если голоса нет, создаем новую запись
+                    new_vote = VoteORM(user_id=user_id, tournament_id=tnmt_id, set_id=set_id)
+                    session.add(new_vote)
+                    await session.commit()
+                    logger.info(
+                        f'Зарегистрирован новый голос пользователя {user_id} на сет {set_id} в турнире {tnmt_id}.')
+                    return True
+
+    @staticmethod
+    async def add_set(tnmt_id: int, set: str) -> None:
+        async with async_session() as session:
+            # Создаем новую запись участия пользователя в турнире
+            new_set = update(TournamentORM).where(TournamentORM.id==tnmt_id).values(set=set)
+            await session.execute(new_set)
+            await session.commit()
+            logger.info(f'Для турнира {tnmt_id} установлен сет {set}')

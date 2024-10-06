@@ -41,18 +41,36 @@ async def set_tnmt_date(message: Message, state: FSMContext):
 
     # Если формат правильный, продолжаем процесс
     await state.update_data(date=date_text)
-    await state.set_state(Add_tnmt.tnmt_name)
+    await state.set_state(Add_tnmt.tnmt_set)
     await message.answer(text=f'Турнир на {date_text}.\n'
                               'Теперь напишите название турнира')
 
-@admin_router.message(Add_tnmt.tnmt_name)
+@admin_router.message(Add_tnmt.tnmt_set)
 async def add_tnmt(message: Message, state: FSMContext):
-    """Хендлер названия турнира./Добавление в базу"""
+    """Хендлер названия турнира.Запрос выбора сета"""
 
     name = message.text
     date = (await state.get_data()).get("date")
-    await AsyncCore.add_tournament(name, date)
-    await message.answer(text='Турнир успешно создан!')
+    await state.update_data(name=name)
+    sets = await AsyncCore.get_sets()
+    await state.set_state(Add_tnmt.tnmt_name)
+
+    keyboard = InlineKeyboardBuilder()
+    for set in sets:
+        keyboard.button(text=set.name, callback_data=f'tnmt_set_{set.name}')
+    keyboard.button(text='Голосование за сет', callback_data=f'vote')
+    await message.answer('Выберите сет:', reply_markup=keyboard.adjust(3).as_markup())
+
+@admin_router.callback_query(Add_tnmt.tnmt_name)
+async def add_tnmt(callback: CallbackQuery, state: FSMContext):
+    """Хендлер сета турнира./Добавление в базу"""
+    name = (await state.get_data()).get("name")
+    date = (await state.get_data()).get("date")
+    tnmt = await AsyncCore.add_tournament(name, date)
+    if callback.data != 'vote':
+        set = callback.data.split("_")[-1]
+        await AsyncCore.add_set(tnmt.id, set)
+    await callback.message.edit_text('Турнир успешно создан!')
     await state.clear()
 
 

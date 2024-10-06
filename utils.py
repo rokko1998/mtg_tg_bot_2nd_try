@@ -48,23 +48,40 @@ async def handle_planned_tournament(
     """
     # Формирование сообщения о турнире с использованием HTML-разметки
     message = f"<b>{tournament_data['name']}</b>\n" \
-              f"> Статус турнира: {tournament_data['status']}\n" \
-              f"Дата проведения: {tournament_data['date'].strftime('%d.%m.%Y')}\n" \
-              f"Кол-во игроков: {len(tournament_players)}\n\n"
+              f"<b>Статус турнира:</b> {tournament_data['status']}\n" \
+              f"<b>Дата проведения:</b> {tournament_data['date'].strftime('%d.%m %H:%M')}\n" \
+              f"<b>Кол-во игроков:</b> {len(tournament_players)}\n\n"
 
-    # Список игроков
-    message += "Список всех игроков данного турнира:\n"
-    for index, player in enumerate(tournament_players, start=1):
-        player_text = f"{index}. {player['username']}"
-        if user_in_tournament and player['user_id'] == user_id:
-            player_text = f"<b>{player_text}</b>"  # Выделение текущего пользователя жирным.
-        message += f"{player_text}\n"
+    set_exists = bool(tournament_data.get('set'))
 
-    # Голосование за сет
-    message += "\nГолосование за сет:\n"
-    set_votes_sorted = sorted(set_votes, key=lambda x: x['votes'], reverse=True)[:3]  # Топ-3 сета
-    for set_info in set_votes_sorted:
-        message += f"{set_info['name']} - {set_info['votes']} голосов\n"
+    if set_exists:
+        message += f"<b>Сет турнира:</b> {tournament_data['set']}\n"
+
+
+    if len(tournament_players) != 0:
+        # Список игроков
+        message += "<b>Список всех игроков данного турнира:</b>\n"
+
+        # Если пользователь участвует в турнире, добавляем его в начало списка.
+        if user_in_tournament:
+            for player in tournament_players:
+                if player['user_id'] == user_id:
+                    player_text = f"<b>1. {player['username']}</b>"  # Выделение текущего пользователя жирным.
+                    message += f"{player_text}\n"
+                    break  # Прекращаем цикл после добавления пользователя
+
+        # Добавляем остальных игроков, пропуская текущего пользователя.
+        for index, player in enumerate(tournament_players,
+                                       start=2):  # Начинаем с 2, чтобы избежать дублирования номера.
+            if player['user_id'] != user_id:  # Пропускаем текущего пользователя.
+                player_text = f"{index}. {player['username']}"
+                message += f"{player_text}\n"
+        if not set_exists:
+            # Голосование за сет
+            message += "\nГолосование за сет:\n"
+            set_votes_sorted = sorted(set_votes, key=lambda x: x['votes'], reverse=True)[:3]  # Топ-3 сета
+            for set_info in set_votes_sorted:
+                message += f"{set_info['name']} - {set_info['votes']} голосов\n"
 
 
 
@@ -72,15 +89,22 @@ async def handle_planned_tournament(
     # Создание клавиатуры
     keyboard = InlineKeyboardBuilder()
 
-    # Добавление кнопок в зависимости от состояния регистрации пользователя
     if user_in_tournament:
+        # Если пользователь уже зарегистрирован, добавляем кнопку "Отменить регистрацию"
         keyboard.row(
-            InlineKeyboardButton(text="Отменить регистрацию", callback_data=f"unregister_{tournament_data['id']}"),
-            InlineKeyboardButton(text="Изменить выбор сета", callback_data=f"change_set_{tournament_data['id']}")
+            InlineKeyboardButton(text="Отменить регистрацию", callback_data=f"unregister_{tournament_data['id']}")
         )
+
+        # Если сет отсутствует, добавляем кнопку "Выбор сета"
+        if not set_exists:
+            keyboard.row(
+                InlineKeyboardButton(text="Выбор сета", callback_data=f"change_set_{tournament_data['id']}")
+            )
     else:
+        # Если пользователь не зарегистрирован, добавляем кнопку "Зарегистрироваться" с измененным callback_data, если сет уже есть
+        callback_data = f"reg_{tournament_data['id']}" if set_exists else f"register_{tournament_data['id']}"
         keyboard.add(
-            InlineKeyboardButton(text="Зарегистрироваться", callback_data=f"register_{tournament_data['id']}")
+            InlineKeyboardButton(text="Зарегистрироваться", callback_data=callback_data)
         )
 
     # Добавление кнопок, которые отображаются всегда
@@ -108,11 +132,11 @@ async def handle_upcoming_tournament(
     """
     # Формирование сообщения о турнире с использованием HTML-разметки
     message = f"<b>{tournament_data['name']}</b>\n" \
-              f"> Статус турнира: {tournament_data['status']}\n" \
-              f"Сет: {tournament_data['set']}\n\n"
+              f"<b>Статус турнира:</b> {tournament_data['status']}\n" \
+              f"<b>Сет:</b> {tournament_data['set']}\n\n"
 
     # Список игроков
-    message += "Список всех игроков данного турнира:\n"
+    message += "<b>Список всех игроков данного турнира:</b>\n"
     for index, player in enumerate(tournament_players, start=1):
         player_status = "Указана колода" if player['deck'] else "Колода не указана"
         player_text = f"{index}. {player['username']} - {player_status}"
