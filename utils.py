@@ -48,7 +48,7 @@ async def handle_planned_tournament(
     """
     # Формирование сообщения о турнире с использованием HTML-разметки
     message = f"<b>{tournament_data['name']}</b>\n" \
-              f"<b>Статус турнира:</b> {tournament_data['status']}\n" \
+              f"<b>Статус турнира:</b> {tournament_data['status']} мск\n" \
               f"<b>Дата проведения:</b> {tournament_data['date'].strftime('%d.%m %H:%M')}\n" \
               f"<b>Кол-во игроков:</b> {len(tournament_players)}\n\n"
 
@@ -75,6 +75,7 @@ async def handle_planned_tournament(
                                        start=2):  # Начинаем с 2, чтобы избежать дублирования номера.
             if player['user_id'] != user_id:  # Пропускаем текущего пользователя.
                 player_text = f"{index}. {player['username']}"
+
                 message += f"{player_text}\n"
         if not set_exists:
             # Голосование за сет

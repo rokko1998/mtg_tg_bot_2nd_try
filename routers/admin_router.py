@@ -8,23 +8,33 @@ from aiogram.enums import chat_action
 from db.core import AsyncCore
 from kb import start_kb
 from logger_conf import logger
-from state import Add_tnmt
+from state import Add_tnmt, Admin_panel
 from aiogram import Bot
 import re
+from kb import admin_panel_kb
 
 admin_router = Router()
 
 # Регулярное выражение для проверки формата даты и времени ДД.ММ.ГГ ЧЧ.ММ
 DATE_TIME_REGEX = r'^\d{2}\.\d{2}\.\d{2} \d{2}\.\d{2}$'
 
+@admin_router.message(Command('admin_panel'))
+async def admin_panel(message: Message, state: FSMContext):
+    """Начало добавления нового турнира./Запрос даты"""
+    # TODO Check_admin()
+    await state.set_state(Admin_panel.ap_menu)
+    await state.update_data(admin=True)
+    await message.answer(text='Добро пожаловать на Кухню таверны "Гнутая мишень', reply_markup=admin_panel_kb)
 
-@admin_router.message(Command('add_tournament'))
-async def cmd_add_tournament(message: Message, state: FSMContext):
+
+
+@admin_router.callback_query(F.data == 'edit_tnmts')
+async def cmd_add_tournament(callback: CallbackQuery, state: FSMContext):
     """Начало добавления нового турнира./Запрос даты"""
     # TODO Check_admin()
     await state.set_state(Add_tnmt.tnmt_date)
     await state.update_data(admin=True)
-    await message.answer(text='Начнем создание нового турнира.\n'
+    await callback.message.edit_text(text='Начнем создание нового турнира.\n'
                               'Для начала введите дату и время турнира в формате: ДД.ММ.ГГ ЧЧ.ММ')
 
 
