@@ -62,21 +62,21 @@ async def handle_planned_tournament(
         # Список игроков
         message += "<b>Список всех игроков данного турнира:</b>\n"
 
-        # Если пользователь участвует в турнире, добавляем его в начало списка.
+        # Формируем список пользователей, текущий пользователь выводится первым, а остальные - в порядке очереди.
         if user_in_tournament:
+            # Добавляем текущего пользователя в начало списка.
             for player in tournament_players:
                 if player['user_id'] == user_id:
-                    player_text = f"<b>1. {player['username']}</b>"  # Выделение текущего пользователя жирным.
+                    player_text = f"<b>{player['username']}</b>"  # Выделение текущего пользователя жирным.
                     message += f"{player_text}\n"
                     break  # Прекращаем цикл после добавления пользователя
 
         # Добавляем остальных игроков, пропуская текущего пользователя.
-        for index, player in enumerate(tournament_players,
-                                       start=2):  # Начинаем с 2, чтобы избежать дублирования номера.
+        for player in tournament_players:
             if player['user_id'] != user_id:  # Пропускаем текущего пользователя.
-                player_text = f"{index}. {player['username']}"
-
+                player_text = f"{player['username']}"
                 message += f"{player_text}\n"
+
         if not set_exists:
             # Голосование за сет
             message += "\nГолосование за сет:\n"
@@ -86,7 +86,6 @@ async def handle_planned_tournament(
 
 
 
-    # Клавиатура
     # Создание клавиатуры
     keyboard = InlineKeyboardBuilder()
 
@@ -118,6 +117,7 @@ async def handle_planned_tournament(
 
 async def handle_upcoming_tournament(
     tournament_data: dict,
+
     user_in_tournament: bool,
     tournament_players: List[dict],
     user_id: int
