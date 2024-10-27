@@ -32,6 +32,7 @@ async def admin_panel(message: Message, state: FSMContext):
 
 @admin_router.callback_query(F.data == 'edit_tnmts')
 async def cmd_add_tournament(callback: CallbackQuery, state: FSMContext):
+
     """Начало добавления нового турнира./Запрос даты"""
     # TODO Check_admin()
     await state.set_state(Add_tnmt.tnmt_date)

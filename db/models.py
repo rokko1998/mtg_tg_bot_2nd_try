@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from dotenv import load_dotenv
 from os import getenv
 
-load_dotenv()
+
 
 DB_USER = getenv('DB_USER')
 DB_PASS = getenv('DB_PASS')
@@ -236,6 +236,7 @@ async def create_and_populate_db():
         print(f'\033[92m Таблицы созданы и тестовые данные добавлены. \033[0m')
 
 if __name__ == "__main__":
+    load_dotenv()
     asyncio.run(create_and_populate_db())
 
 

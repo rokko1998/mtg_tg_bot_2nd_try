@@ -1,0 +1,48 @@
+version: '3.3'
+
+services:
+  bot:
+    image: shevka/mtgtgbot:v1.3
+    container_name: telegram_bot
+    restart: always
+    env_file: .env
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8443:8443"
+    volumes:
+        - /etc/letsencrypt/live/mtgtgbot.online/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
+        - /etc/letsencrypt/live/mtgtgbot.online/privkey.pem:/etc/ssl/private/privkey.pem:ro
+    networks:
+      - bot_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot_network
+
+networks:
+  bot_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
