@@ -8,75 +8,74 @@ import ssl
 import ast
 from dotenv import load_dotenv
 from os import getenv
-from logger_conf import start_listener, stop_listener, logger  # Импортируем listener и логгер
+from logger_conf import start_listener, stop_listener, logger
 from mw import LogUserActionsMiddleware
 from aiohttp import web
 from redis.asyncio import Redis
-
-from aiogram.types import Update  # Импортируем Update
-
+from aiogram.types import Update
 from routers.user_router import user_router
 from routers.admin_router import admin_router
 
-# Создаем экземпляр Redis с указанием хоста, порта и базы данных
+# Подключение к Redis
 redis = Redis(host='localhost', port=6379, db=0)
-
-# Настраиваем RedisStorage для работы с FSM
 storage = RedisStorage(redis=redis)
-
 load_dotenv()
 
+# Получаем токен и настройки вебхука
 TOKEN = getenv('TOKEN')
 OWNER_ID = getenv('OWNER_ID')
 WEBHOOK_URL = getenv('WEBHOOK_URL', "https://mtgtgbot.online/webhook")
 
+# Создаем экземпляр бота и диспетчера
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=storage)
 dp.message.middleware(LogUserActionsMiddleware())
 dp.callback_query.middleware(LogUserActionsMiddleware())
 
 async def start_bot(bot: Bot):
+    try:
+        await bot.set_webhook(WEBHOOK_URL)
+        logging.info("Webhook успешно установлен на URL %s.", WEBHOOK_URL)
+    except Exception as e:
+        logging.error(f"Ошибка при установке вебхука: {e}")
+        raise  # Останавливаем запуск при ошибке установки вебхука
     await bot.send_message(chat_id=OWNER_ID, text='Бот запущен!')
-    await bot.set_webhook(WEBHOOK_URL)
 
-# Определяем обработчик вебхука
 async def handle(request):
-    request_body_dict = await request.json()
-    update = Update.to_object(request_body_dict)
-    await dp.feed_update(bot, update)
+    try:
+        request_body_dict = await request.json()
+        update = Update.to_object(request_body_dict)
+        await dp.feed_update(bot, update)
+        logging.info("Обновление обработано успешно")
+    except Exception as e:
+        logging.error(f"Ошибка при обработке обновления: {e}")
     return web.Response()
 
-# Настройка маршрута для вебхука и запуск веб-сервера
 async def start_webhook():
     app = web.Application()
-    app.router.add_post('/webhook', handle)  # Используем наш обработчик
+    app.router.add_post('/webhook', handle)
 
     runner = web.AppRunner(app)
     await runner.setup()
-
-    # Настройка SSL-контекста
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    ssl_context.load_cert_chain(
-        '/etc/ssl/certs/fullchain.pem',
-        '/etc/ssl/private/privkey.pem'
-    )
-
-    # Указание SSL-контекста при запуске веб-сервера
-    site = web.TCPSite(runner, '0.0.0.0', 8443, ssl_context=ssl_context)  # Слушаем на порту 8443
-    await site.start()
-    logging.info("Веб-сервер успешно запущен и слушает вебхук.")
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    try:
+        await site.start()
+        logging.info("Веб-сервер успешно запущен и слушает вебхук на порту 8080.")
+    except Exception as e:
+        logging.error(f"Ошибка при запуске веб-сервера: {e}")
+        raise  # Остановим процесс при ошибке запуска
 
 dp.startup.register(start_bot)
 dp.include_routers(user_router, admin_router)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    start_listener()  # Запускаем слушателя очереди
+    start_listener()
     try:
         asyncio.run(start_webhook())
         logger.info("Бот запущен!")
     except KeyboardInterrupt:
-        logger.warning(f"Бот был остановлен пользователем.\n\n\n")
+        logger.warning("Бот был остановлен пользователем.")
     finally:
-        stop_listener()  # Останавливаем слушателя очереди
+        stop_listener()
         logger.info("Слушатель логов остановлен.")

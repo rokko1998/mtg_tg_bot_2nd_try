@@ -1,30 +1,31 @@
 import logging
 import queue
+import os
 from logging.handlers import RotatingFileHandler, QueueHandler, QueueListener
 
 # Настройка очереди и логгера
 log_queue = queue.Queue()
 queue_handler = QueueHandler(log_queue)
 
-# Основной логгер
 logger = logging.getLogger('rotating_threaded_logger')
 logger.setLevel(logging.DEBUG)
 
-# Обработчик с ротацией файлов по размеру
-rotating_handler = RotatingFileHandler('app.log', maxBytes=1024 * 1024, backupCount=3)  # Увеличенный размер для тестирования
+# Ротация логов, файлы до 10MB с максимумом в 5 копий
+rotating_handler = RotatingFileHandler('app.log', maxBytes=10 * 1024 * 1024, backupCount=5)
 rotating_handler.setLevel(logging.DEBUG)
 
-# Формат для логов
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 rotating_handler.setFormatter(formatter)
 
-# Слушатель очереди
-listener = QueueListener(log_queue, rotating_handler)
+# Настройка консольного логирования
+if os.getenv("LOG_TO_CONSOLE", "true").lower() == "true":
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
 
-# Добавляем обработчик очереди к логгеру
+listener = QueueListener(log_queue, rotating_handler)
 logger.addHandler(queue_handler)
 
-# Запускаем слушатель из основного файла
 def start_listener():
     listener.start()
 

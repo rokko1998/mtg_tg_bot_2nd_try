@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   bot:
-    image: shevka/mtgtgbot:v1.3
+    image: shevka/mtgtgbot:v1.9
     container_name: telegram_bot
     restart: always
     env_file: .env
@@ -11,11 +11,13 @@ services:
       - redis
     ports:
       - "8443:8443"
-    volumes:
-        - /etc/letsencrypt/live/mtgtgbot.online/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
-        - /etc/letsencrypt/live/mtgtgbot.online/privkey.pem:/etc/ssl/private/privkey.pem:ro
     networks:
       - bot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"  # Ограничение размера лога на 10MB
+        max-file: "5"  # До 5 файлов-ротаций
 
   db:
     image: postgres:15-alpine
@@ -29,6 +31,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - bot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   redis:
     image: redis:7-alpine
@@ -38,6 +45,11 @@ services:
       - redis_data:/data
     networks:
       - bot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 networks:
   bot_network:
