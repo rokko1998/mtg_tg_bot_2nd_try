@@ -5,7 +5,6 @@ from aiogram.fsm.storage.redis import RedisStorage
 import asyncio
 import logging
 import ssl
-import ast
 from dotenv import load_dotenv
 from os import getenv
 from logger_conf import start_listener, stop_listener, logger
@@ -25,6 +24,12 @@ load_dotenv()
 TOKEN = getenv('TOKEN')
 OWNER_ID = getenv('OWNER_ID')
 WEBHOOK_URL = getenv('WEBHOOK_URL', "https://mtgtgbot.online/webhook")
+
+# Проверка наличия необходимых переменных окружения
+if not TOKEN:
+    raise ValueError("TOKEN не найден в переменных окружения!")
+if not OWNER_ID:
+    raise ValueError("OWNER_ID не найден в переменных окружения!")
 
 # Создаем экземпляр бота и диспетчера
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))

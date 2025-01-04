@@ -1,0 +1,45 @@
+name: Deploy Telegram Bot  # Название CI/CD pipeline
+
+on:
+  push:
+    branches:
+      - main  # Запуск workflow при пуше в основную ветку
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # Используем последнюю версию Ubuntu как среду выполнения
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3  # Загружаем код из репозитория
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2  # Настраиваем Buildx для более эффективной сборки Docker-образов
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2  # Авторизация в DockerHub
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}  # Имя пользователя DockerHub из секретов
+          password: ${{ secrets.DOCKERHUB_TOKEN }}  # Токен DockerHub из секретов
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4  # Сборка и публикация Docker-образа
+        with:
+          context: .  # Указываем корневую папку проекта
+          push: true  # Загружаем образ в DockerHub
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest  # Тэг для образа
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v0.1.10  # Подключаемся по SSH к серверу для деплоя
+        with:
+          host: ${{ secrets.SERVER_HOST }}  # IP или домен сервера из секретов
+          username: ${{ secrets.SERVER_USER }}  # Имя пользователя сервера
+          key: ${{ secrets.SSH_PRIVATE_KEY }}  # Закрытый SSH-ключ для аутентификации
+          script: |
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest  # Загружаем новый образ
+            docker-compose down  # Останавливаем текущие контейнеры
+            docker-compose up -d  # Запускаем обновленный контейнер в фоновом режиме
+
+      - name: Cleanup old Docker images
+        run: |
+          docker image prune -af  # Удаляем старые неиспользуемые Docker-образы
