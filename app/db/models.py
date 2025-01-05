@@ -12,13 +12,16 @@ from dotenv import load_dotenv
 from os import getenv
 
 
-
 DB_USER = getenv('DB_USER')
 DB_PASS = getenv('DB_PASS')
-DB_HOST = getenv('DB_HOST')
+DB_HOST = getenv('DB_HOST', 'localhost')
 DB_PORT = getenv('DB_PORT', '5432')  # По умолчанию порт 5432
 DB_NAME = getenv('DB_NAME')
+
+print(f"DB_USER={DB_USER}, DB_PASS={DB_PASS}, DB_HOST={DB_HOST}, DB_PORT={DB_PORT}, DB_NAME={DB_NAME}")
+
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
 
 
 engine = create_async_engine(DATABASE_URL, echo=True)
@@ -239,5 +242,3 @@ async def create_and_populate_db():
 if __name__ == "__main__":
     load_dotenv()
     asyncio.run(create_and_populate_db())
-
-

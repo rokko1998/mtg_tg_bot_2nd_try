@@ -2,18 +2,17 @@ FROM python:3.11-slim
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
-
-# Устанавливаем переменные окружения
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Копируем файлы проекта
-COPY requirements.txt .
+# Копируем только requirements.txt перед установкой зависимостей
+COPY requirements.txt /app/requirements.txt
 
 # Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Копируем весь код в контейнер
-COPY . .
+# Теперь копируем весь код (кеширование останется эффективным)
+COPY . /app
 
 # Открываем порт для вебхука (совпадает с конфигурацией nginx)
 EXPOSE 8000

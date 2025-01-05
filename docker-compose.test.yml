@@ -1,0 +1,46 @@
+services:
+  bot_app:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: bot_app_test
+    env_file:
+      - .env  # Подключаем переменные окружения
+    environment:
+      - USE_POLLING=true  # Запускаем бота в режиме поллинга
+      - REDIS_HOST=redis_test
+      - DB_HOST=postgres_test  # Указываем имя хоста БД
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - logs_test:/app/logs  # Логи тестового бота
+    networks:
+      - app_network
+
+  db:
+    image: postgres:15
+    container_name: postgres_test
+    env_file:
+      - .env  # Берем данные из окружения
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  redis:
+    image: redis:latest
+    container_name: redis_test
+    volumes:
+      - redis_test_data:/data
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
+  redis_test_data:
+  logs_test:
